@@ -1,0 +1,152 @@
+{
+  "entities": {
+    "Publisher": {
+      "title": "Publisher",
+      "description": "Represents a publication or brand on Narratif.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "brandColor": { "type": "string" },
+        "selectedThemeId": { "type": "string" },
+        "brandLogoUrl": { "type": "string" },
+        "playerStyle": { "type": "string", "enum": ["dark", "light"] },
+        "playerFont": { "type": "string" },
+        "playerLayout": { "type": "string", "enum": ["compact", "standard"] },
+        "customDomain": { "type": "string" },
+        "backgroundImageUrl": { "type": "string" },
+        "industryContext": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "selectedAccent": { "type": "string" },
+        "fmt": { "type": "string", "enum": ["solo", "two-host"] },
+        "visibility": { "type": "string", "enum": ["public", "private"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "brandColor"]
+    },
+    "MagazineIssue": {
+      "title": "Magazine Issue",
+      "description": "Represents a specific issue of a magazine uploaded by a media company.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "publisherId": { "type": "string" },
+        "title": { "type": "string" },
+        "issueNumber": { "type": "string" },
+        "month": { "type": "string" },
+        "year": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["uploaded", "analyzing", "ready", "archived"] },
+        "articleCount": { "type": "number" },
+        "adCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "publisherId", "title", "status", "createdAt"]
+    },
+    "Episode": {
+      "title": "Episode",
+      "description": "A generated podcast episode or segment.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "publisherId": { "type": "string" },
+        "channelId": { "type": "string" },
+        "issueId": { "type": "string" },
+        "type": { "type": "string", "enum": ["overview", "article", "advertisement"] },
+        "title": { "type": "string" },
+        "teaser": { "type": "string" },
+        "duration": { "type": "string" },
+        "category": { "type": "string" },
+        "transcript": { "type": "array" },
+        "takeaways": { "type": "array" },
+        "tags": { "type": "array" },
+        "host1Id": { "type": "string" },
+        "host2Id": { "type": "string" },
+        "format": { "type": "string" },
+        "status": { "type": "string" },
+        "audioSegmentsUrl": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "narrativeStyle": { "type": "string" },
+        "industryContext": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "loads": { "type": "number" },
+        "plays": { "type": "number" },
+        "completions": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "publisherId", "title", "status", "createdAt"]
+    },
+    "Listener": {
+      "title": "Listener",
+      "description": "A listener user profile.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["displayName", "email"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "Represents a Narratif Podcast Channel for a publisher.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "publisherId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "artworkUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "publisherId", "name", "createdAt"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Represents a background job, such as TTS generation.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+        "progress": { "type": "number" },
+        "error": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["status", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/publishers/{publisherId}": {
+      "schema": "Publisher",
+      "description": "Root collection for publishers."
+    },
+    "/issues/{issueId}": {
+      "schema": "MagazineIssue",
+      "description": "Collection of all magazine issues."
+    },
+    "/episodes/{episodeId}": {
+      "schema": "Episode",
+      "description": "Collection of all podcast episodes."
+    },
+    "/channels/{channelId}": {
+      "schema": "Channel",
+      "description": "Podcast channels for publishers."
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Collection of background jobs."
+    },
+    "/listeners/{listenerId}": {
+      "schema": "Listener",
+      "description": "Root collection for listeners."
+    },
+    "/listeners/{listenerId}/following/{publisherId}": {
+      "schema": { "type": "object", "properties": { "followedAt": { "type": "string", "format": "date-time" } } },
+      "description": "Sub-collection of publishers followed by a listener."
+    }
+  }
+}

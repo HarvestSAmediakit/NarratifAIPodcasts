@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ALLOW CONNECTION TEST
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // HELPER FUNCTIONS
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(data) { return isSignedIn() && data.ownerId == request.auth.uid; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // VALIDATION HELPERS
+    function isValidPublisher(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'brandColor']) &&
+             data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() <= 100 &&
+             data.brandColor is string && data.brandColor.matches('^#[A-Fa-f0-9]{6}$') &&
+             (!('visibility' in data) || data.visibility in ['public', 'private']);
+    }
+
+    function isValidEpisode(data) {
+      return data.keys().hasAll(['ownerId', 'publisherId', 'title', 'status', 'createdAt']) &&
+             data.ownerId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.createdAt == request.time &&
+             exists(/databases/$(database)/documents/publishers/$(data.publisherId));
+    }
+
+    function isValidChannel(data) {
+      return data.keys().hasAll(['ownerId', 'publisherId', 'name', 'createdAt']) &&
+             data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() <= 100 &&
+             data.createdAt == request.time &&
+             exists(/databases/$(database)/documents/publishers/$(data.publisherId));
+    }
+
+    function isValidIssue(data) {
+      return data.keys().hasAll(['ownerId', 'publisherId', 'title', 'status', 'createdAt']) &&
+             data.ownerId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.createdAt == request.time &&
+             data.status in ["uploaded", "analyzing", "ready", "archived"];
+    }
+
+    // PUBLISHERS
+    match /publishers/{publisherId} {
+      allow read: if true; // Public can see publisher profiles
+      allow create: if isVerified() && isValidPublisher(incoming());
+      allow update: if isOwner(existing()) && isValidPublisher(incoming()) && 
+                    incoming().ownerId == existing().ownerId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'name', 'brandColor', 'selectedThemeId', 'brandLogoUrl', 
+                      'playerStyle', 'playerFont', 'playerLayout', 'customDomain', 
+                      'backgroundImageUrl', 'industryContext', 'targetAudience', 
+                      'selectedAccent', 'fmt', 'visibility', 'updatedAt'
+                    ]);
+      allow delete: if isOwner(existing());
+    }
+
+    // CHANNELS
+    match /channels/{channelId} {
+      allow read: if true; // Public can see channels
+      allow create: if isVerified() && isValidId(channelId) && isValidChannel(incoming());
+      allow update: if isOwner(existing()) && isValidChannel(incoming()) &&
+                    incoming().ownerId == existing().ownerId &&
+                    incoming().publisherId == existing().publisherId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'name', 'description', 'artworkUrl', 'updatedAt'
+                    ]);
+      allow delete: if isOwner(existing());
+    }
+
+    // ISSUES
+    match /issues/{issueId} {
+      allow read: if isOwner(resource.data);
+      allow create: if isVerified() && isValidId(issueId) && isValidIssue(incoming());
+      allow update: if isOwner(existing()) && isValidIssue(incoming()) &&
+                    incoming().ownerId == existing().ownerId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'title', 'issueNumber', 'month', 'year', 'coverUrl', 'pdfUrl', 
+                      'status', 'articleCount', 'adCount', 'updatedAt'
+                    ]);
+      allow delete: if isOwner(existing());
+    }
+
+    // EPISODES
+    match /episodes/{episodeId} {
+      allow read: if resource.data.isPublic == true || 
+                     (request.auth != null && resource.data.ownerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(episodeId) && isValidEpisode(incoming());
+      allow update: if isOwner(existing()) && isValidEpisode(incoming()) &&
+                    incoming().ownerId == existing().ownerId &&
+                    incoming().publisherId == existing().publisherId &&
+                    incoming().createdAt == existing().createdAt &&
+                    (
+                      // Action: Edit metadata
+                      incoming().diff(existing()).affectedKeys().hasOnly([
+                        'channelId', 'issueId', 'type', 'title', 'teaser', 'duration', 'category', 'transcript', 
+                        'takeaways', 'tags', 'host1Id', 'host2Id', 'format', 
+                        'status', 'audioSegmentsUrl', 'isPublic', 'narrativeStyle', 
+                        'industryContext', 'targetAudience', 'updatedAt'
+                      ]) ||
+                      // Action: Sync stats (Allow increment)
+                      incoming().diff(existing()).affectedKeys().hasOnly(['loads', 'plays', 'completions', 'updatedAt'])
+                    );
+      allow delete: if isOwner(existing());
+    }
+
+    // JOBS (TTS Progress)
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+    }
+
+    // ANALYTICS
+    match /analytics_events/{eventId} {
+      allow create: if true; // Public can track events
+      allow read: if isSignedIn(); // Only admins should read, but we'll simplified for now
+    }
+
+    // LISTENERS/USERS
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId &&
+                            incoming().email == request.auth.token.email;
+      
+      match /following/{publisherId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+}
